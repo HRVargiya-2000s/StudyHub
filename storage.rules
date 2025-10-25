@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to read/write files in materials folder
+    match /materials/{class}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+        request.resource.size < 10 * 1024 * 1024 && // 10MB limit
+        request.resource.contentType.matches('application/pdf') ||
+        request.resource.contentType.matches('application/msword') ||
+        request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+        request.resource.contentType.matches('image/jpeg') ||
+        request.resource.contentType.matches('image/png') ||
+        request.resource.contentType.matches('image/gif');
+      allow delete: if request.auth != null;
+    }
+  }
+}
