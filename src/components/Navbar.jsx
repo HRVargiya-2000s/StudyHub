@@ -1,21 +1,15 @@
 // src/components/Navbar.jsx
+
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const classes = [
-  'IT-1A', 'IT-1B', 'IT-2A', 'IT-2B', 'IT-3A', 'IT-3B', 'IT-4A', 'IT-4B', 'IT-5A', 'IT-5B',
-  'CSE-1A', 'CSE-1B', 'CSE-2A', 'CSE-2B', 'CSE-3A', 'CSE-3B', 'CSE-4A', 'CSE-4B', 'CSE-5A', 'CSE-5B',
-  'ECE-1A', 'ECE-1B', 'ECE-2A', 'ECE-2B', 'ECE-3A', 'ECE-3B', 'ECE-4A', 'ECE-4B',
-  'ME-1A', 'ME-1B', 'ME-2A', 'ME-2B', 'ME-3A', 'ME-3B', 'ME-4A', 'ME-4B',
-  'CE-1A', 'CE-1B', 'CE-2A', 'CE-2B', 'CE-3A', 'CE-3B', 'CE-4A', 'CE-4B'
-];
-
-export default function Navbar({ onUploadClick }) {
+export default function Navbar() {
+  const { user, userData, logout } = useAuth();
   const navigate = useNavigate();
-  const { user, userData, logout, updateUserClass } = useAuth();
-  const [showClassDropdown, setShowClassDropdown] = useState(false);
-  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const location = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -26,184 +20,132 @@ export default function Navbar({ onUploadClick }) {
     }
   };
 
-  const handleClassChange = async (newClass) => {
-    try {
-      await updateUserClass(newClass);
-      setShowClassDropdown(false);
-    } catch (error) {
-      console.error('Error updating class:', error);
-    }
+  const isActive = (path) => {
+    return location.pathname === path;
   };
 
+  if (!user) return null;
+
   return (
-    <nav className="bg-white shadow-md border-b border-gray-200">
+    <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <button
-              onClick={() => navigate('/')}
-              className="text-xl font-bold text-blue-600 hover:text-blue-700"
-            >
-              StudyHub
-            </button>
-          </div>
-
-          {/* Center - Class Selector */}
-          <div className="hidden md:flex items-center space-x-4">
-            <div className="relative">
-              <button
-                onClick={() => setShowClassDropdown(!showClassDropdown)}
-                className="flex items-center space-x-2 px-3 py-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-              >
-                <span className="text-sm font-medium text-gray-700">
-                  Class: {userData?.class || 'Select Class'}
-                </span>
-                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <Link to="/home" className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
-              </button>
-
-              {showClassDropdown && (
-                <div className="absolute top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
-                  {classes.map((className) => (
-                    <button
-                      key={className}
-                      onClick={() => handleClassChange(className)}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                        userData?.class === className ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                      }`}
-                    >
-                      {className}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Upload Button */}
-            <button
-              onClick={onUploadClick}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
-            >
-              Upload Material
-            </button>
-          </div>
-
-          {/* Right side - Profile */}
-          <div className="flex items-center space-x-4">
-            {/* User Info */}
-            <div className="hidden md:flex items-center space-x-3">
-              {user?.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt="Profile"
-                  className="w-8 h-8 rounded-full"
-                />
-              ) : (
-                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                  <span className="text-gray-600 text-sm font-medium">
-                    {user?.displayName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <div className="text-sm">
-                <div className="font-medium text-gray-800">
-                  {userData?.name || user?.displayName}
-                </div>
-                <div className="text-gray-500">
-                  {userData?.class || 'No class set'}
-                </div>
               </div>
-            </div>
+              <span className="text-xl font-bold text-gray-900 hidden sm:block">StudyHub</span>
+            </Link>
+          </div>
 
-            {/* Profile Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                className="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100 transition-colors"
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-6">
+            <Link
+              to="/home"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                isActive('/home')
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span className="font-medium">Home</span>
+            </Link>
+
+            {userData?.class && (
+              <div className="px-3 py-1.5 bg-gray-100 rounded-full text-sm text-gray-700">
+                <span className="font-medium">{userData.class}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Profile Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+              className="flex items-center gap-2 hover:bg-gray-50 rounded-lg p-2 transition-colors"
+            >
+              <img
+                src={user?.photoURL || 'https://via.placeholder.com/40'}
+                alt={user?.displayName}
+                className="w-8 h-8 rounded-full border-2 border-gray-200"
+              />
+              <span className="hidden sm:block text-sm font-medium text-gray-700">
+                {user?.displayName?.split(' ')[0]}
+              </span>
+              <svg
+                className={`w-4 h-4 text-gray-500 transition-transform ${
+                  isProfileDropdownOpen ? 'rotate-180' : ''
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                </svg>
-              </button>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
-              {showProfileDropdown && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+            {/* Dropdown Menu */}
+            {isProfileDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setIsProfileDropdownOpen(false)}
+                ></div>
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <p className="text-sm font-medium text-gray-900">{user?.displayName}</p>
+                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                  </div>
+
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsProfileDropdownOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span className="text-sm text-gray-700">Profile Settings</span>
+                  </Link>
+
+                  <Link
+                    to="/home"
+                    onClick={() => setIsProfileDropdownOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors md:hidden"
+                  >
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    <span className="text-sm text-gray-700">Home</span>
+                  </Link>
+
+                  <div className="border-t border-gray-200 my-2"></div>
+
                   <button
                     onClick={() => {
-                      navigate('/profile');
-                      setShowProfileDropdown(false);
+                      setIsProfileDropdownOpen(false);
+                      handleLogout();
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-red-50 transition-colors w-full text-left"
                   >
-                    Profile Settings
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    Logout
+                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span className="text-sm text-red-600">Sign Out</span>
                   </button>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Class Selector & Upload */}
-        <div className="md:hidden pb-4">
-          <div className="flex items-center justify-between">
-            <div className="relative flex-1 mr-4">
-              <button
-                onClick={() => setShowClassDropdown(!showClassDropdown)}
-                className="w-full flex items-center justify-between px-3 py-2 bg-gray-100 rounded-md"
-              >
-                <span className="text-sm font-medium text-gray-700">
-                  Class: {userData?.class || 'Select Class'}
-                </span>
-                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {showClassDropdown && (
-                <div className="absolute top-full mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
-                  {classes.map((className) => (
-                    <button
-                      key={className}
-                      onClick={() => handleClassChange(className)}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                        userData?.class === className ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                      }`}
-                    >
-                      {className}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={onUploadClick}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 font-medium text-sm"
-            >
-              Upload
-            </button>
+              </>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Overlay for dropdowns */}
-      {(showClassDropdown || showProfileDropdown) && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => {
-            setShowClassDropdown(false);
-            setShowProfileDropdown(false);
-          }}
-        />
-      )}
     </nav>
   );
 }

@@ -1,240 +1,208 @@
 // src/components/UploadModal.jsx
-import { useState, useRef } from 'react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { storage, db } from '../config/firebase';
+
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { db, storage } from '../config/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
-const categories = [
-  'Notes',
-  'Lab Manual',
-  'Book',
-  'Practical File',
-  'Notification'
-];
-
-export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
+export default function UploadModal({ onClose }) {
   const { user, userData } = useAuth();
   const [file, setFile] = useState(null);
+  const [fileName, setFileName] = useState('');
   const [category, setCategory] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [error, setError] = useState('');
-  const fileInputRef = useRef(null);
-  const [dragActive, setDragActive] = useState(false);
 
-  const allowedTypes = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'image/jpeg',
-    'image/png',
-    'image/gif'
-  ];
+  const categories = ['Notes', 'Lab Manual', 'Book', 'Practical File', 'Notification'];
 
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      // Check file size (max 10MB)
+      if (selectedFile.size > 10 * 1024 * 1024) {
+        alert('File size should not exceed 10MB');
+        return;
+      }
+      setFile(selectedFile);
+      setFileName(selectedFile.name);
     }
   };
 
-  const handleDrop = (e) => {
+  const handleUpload = async (e) => {
     e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleFileSelect = (selectedFile) => {
-    if (!allowedTypes.includes(selectedFile.type)) {
-      setError('Please select a PDF, DOCX, or image file.');
+    if (!file || !category || !fileName.trim()) {
+      alert('Please fill all fields and select a file');
       return;
     }
 
-    if (selectedFile.size > 10 * 1024 * 1024) { // 10MB limit
-      setError('File size must be less than 10MB.');
-      return;
-    }
-
-    setFile(selectedFile);
-    setError('');
-  };
-
-  const handleFileInputChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFileSelect(e.target.files[0]);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file || !category || !userData?.class) {
-      setError('Please select a file, category, and ensure you have a class set.');
+    if (!userData?.class) {
+      alert('Please set your class in profile settings first');
       return;
     }
 
     setUploading(true);
-    setUploadProgress(0);
-    setError('');
 
     try {
       // Upload file to Firebase Storage
-      const storageRef = ref(storage, `materials/${userData.class}/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      const fileRef = ref(storage, `materials/${userData.class}/${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(fileRef, file);
 
-      // Save metadata to Firestore
-      await addDoc(collection(db, 'materials'), {
-        fileName: file.name,
-        fileURL: downloadURL,
-        category: category,
-        uploadedBy: userData.name,
-        uploaderUID: user.uid,
-        class: userData.class,
-        uploadDate: serverTimestamp(),
-        fileSize: file.size,
-        fileType: file.type
-      });
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(Math.round(progress));
+        },
+        (error) => {
+          console.error('Upload error:', error);
+          alert('Upload failed. Please try again.');
+          setUploading(false);
+        },
+        async () => {
+          // Get download URL
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
 
-      setUploadProgress(100);
-      onUploadSuccess && onUploadSuccess();
-      handleClose();
-    } catch (err) {
-      console.error('Upload error:', err);
-      setError('Failed to upload file. Please try again.');
-    } finally {
+          // Save metadata to Firestore
+          await addDoc(collection(db, 'materials'), {
+            fileName: fileName.trim(),
+            category,
+            fileURL: downloadURL,
+            class: userData.class,
+            uploadedBy: user.displayName,
+            uploaderUID: user.uid,
+            uploadDate: serverTimestamp(),
+          });
+
+          alert('Material uploaded successfully!');
+          onClose();
+        }
+      );
+    } catch (error) {
+      console.error('Error uploading material:', error);
+      alert('Failed to upload material. Please try again.');
       setUploading(false);
     }
   };
 
-  const handleClose = () => {
-    setFile(null);
-    setCategory('');
-    setError('');
-    setUploadProgress(0);
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-800">Upload Study Material</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900">Upload Material</h2>
           <button
-            onClick={handleClose}
-            className="text-gray-500 hover:text-gray-700"
+            onClick={onClose}
+            disabled={uploading}
+            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
           >
-            ✕
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
+        {/* Form */}
+        <form onSubmit={handleUpload} className="p-6 space-y-4">
+          {/* File Name Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Material Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              placeholder="e.g., Data Structures Notes - Unit 1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={uploading}
+              required
+            />
           </div>
-        )}
 
-        {/* File Upload Area */}
-        <div
-          className={`border-2 border-dashed rounded-lg p-6 text-center mb-4 transition-colors ${
-            dragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
-          }`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-        >
-          {file ? (
-            <div className="text-green-600">
-              <div className="text-lg font-medium">✓ {file.name}</div>
-              <div className="text-sm text-gray-500">
-                {(file.size / 1024 / 1024).toFixed(2)} MB
-              </div>
+          {/* Category Select */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              disabled={uploading}
+              required
+            >
+              <option value="">-- Select Category --</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* File Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              File <span className="text-red-500">*</span>
+            </label>
+            <div className="mt-1">
+              <input
+                type="file"
+                onChange={handleFileChange}
+                accept=".pdf,.docx,.doc,.jpg,.jpeg,.png"
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                disabled={uploading}
+                required
+              />
             </div>
-          ) : (
+            <p className="mt-1 text-xs text-gray-500">
+              Supported: PDF, DOCX, DOC, JPG, PNG (Max 10MB)
+            </p>
+          </div>
+
+          {/* Class Info */}
+          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Uploading to:</span>{' '}
+              <span className="text-blue-600 font-semibold">{userData?.class}</span>
+            </p>
+          </div>
+
+          {/* Upload Progress */}
+          {uploading && (
             <div>
-              <div className="text-gray-500 mb-2">
-                Drag & drop your file here, or{' '}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-blue-500 hover:text-blue-700 underline"
-                >
-                  browse
-                </button>
+              <div className="flex justify-between text-sm text-gray-600 mb-1">
+                <span>Uploading...</span>
+                <span>{uploadProgress}%</span>
               </div>
-              <div className="text-sm text-gray-400">
-                PDF, DOCX, or images (max 10MB)
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
               </div>
             </div>
           )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            onChange={handleFileInputChange}
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
-            className="hidden"
-          />
-        </div>
 
-        {/* Category Selection */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Category
-          </label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select a category</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Upload Progress */}
-        {uploading && (
-          <div className="mb-4">
-            <div className="bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              ></div>
-            </div>
-            <div className="text-sm text-gray-600 mt-1">
-              Uploading... {uploadProgress}%
-            </div>
+          {/* Actions */}
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={uploading}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={uploading || !file || !category || !fileName.trim()}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              {uploading ? 'Uploading...' : 'Upload'}
+            </button>
           </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={handleClose}
-            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-            disabled={uploading}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleUpload}
-            disabled={!file || !category || uploading}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-          >
-            {uploading ? 'Uploading...' : 'Upload'}
-          </button>
-        </div>
+        </form>
       </div>
     </div>
   );
