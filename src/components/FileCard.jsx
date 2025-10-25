@@ -1,58 +1,46 @@
 "use client"
 
 import { useState } from "react"
-import { ref, getBytes } from "firebase/storage"
-import { storage } from "../config/firebase"
-import "../styles/FileCard.css";  // ← Changed from "./FileCard.css"
+import { db, storage } from "../config/firebase"
+import { doc, deleteDoc } from "firebase/firestore"
+import { ref, deleteObject } from "firebase/storage"
+import "../styles/FileCard.css"
 
 export default function FileCard({ material }) {
+  const [isDeleting, setIsDeleting] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
+
+  const getCategoryIcon = (category) => {
+    const icons = {
+      Notes: "fa-file-alt",
+      "Lab Manual": "fa-flask",
+      Book: "fa-book",
+      "Practical File": "fa-folder",
+      Notification: "fa-bell",
+    }
+    return icons[category] || "fa-file"
+  }
 
   const getCategoryColor = (category) => {
     const colors = {
-      Notes: "#6366f1",
-      "Lab Manual": "#ec4899",
-      Book: "#10b981",
-      "Practical File": "#f59e0b",
+      Notes: "#00ffff",
+      "Lab Manual": "#9b30ff",
+      Book: "#00ffff",
+      "Practical File": "#9b30ff",
       Notification: "#ef4444",
     }
-    return colors[category] || "#6b7280"
-  }
-
-  const getFileIcon = (fileName) => {
-    const ext = fileName.split(".").pop().toLowerCase()
-    const icons = {
-      pdf: "📄",
-      doc: "📝",
-      docx: "📝",
-      xls: "📊",
-      xlsx: "📊",
-      ppt: "🎯",
-      pptx: "🎯",
-      zip: "📦",
-      rar: "📦",
-      txt: "📋",
-      jpg: "🖼️",
-      png: "🖼️",
-      jpeg: "🖼️",
-    }
-    return icons[ext] || "📎"
+    return colors[category] || "#00ffff"
   }
 
   const handleDownload = async () => {
     try {
       setIsDownloading(true)
-      const fileRef = ref(storage, material.fileUrl)
-      const bytes = await getBytes(fileRef)
-      const blob = new Blob([bytes])
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = material.fileName
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      const link = document.createElement("a")
+      link.href = material.fileURL
+      link.download = material.fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
     } catch (error) {
       console.error("Download error:", error)
       alert("Failed to download file")
@@ -61,18 +49,36 @@ export default function FileCard({ material }) {
     }
   }
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this material?")) return
+
+    setIsDeleting(true)
+    try {
+      await deleteDoc(doc(db, "materials", material.id))
+      if (material.fileURL) {
+        const fileRef = ref(storage, material.fileURL)
+        await deleteObject(fileRef)
+      }
+    } catch (error) {
+      alert("Failed to delete material.")
+      console.error(error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const formatDate = (date) => {
     if (!date) return ""
-    const d = new Date(date.seconds * 1000)
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    const d = date.toDate ? date.toDate() : new Date(date)
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
   }
 
   return (
-    <div className="file-card">
+    <div className="file-card glass">
       <div className="card-header">
-        <div className="file-icon">{getFileIcon(material.fileName)}</div>
-        <div className="category-tag" style={{ backgroundColor: getCategoryColor(material.category) }}>
-          {material.category}
+        <div className="category-badge" style={{ borderColor: getCategoryColor(material.category) }}>
+          <i className={`fas ${getCategoryIcon(material.category)}`}></i>
+          <span>{material.category}</span>
         </div>
       </div>
 
@@ -82,14 +88,33 @@ export default function FileCard({ material }) {
         </h3>
 
         <div className="file-meta">
-          <span className="uploader">By {material.uploadedBy}</span>
-          <span className="upload-date">{formatDate(material.uploadDate)}</span>
+          <div className="meta-item">
+            <i className="fas fa-user"></i>
+            <span>{material.uploadedBy}</span>
+          </div>
+          <div className="meta-item">
+            <i className="fas fa-calendar"></i>
+            <span>{formatDate(material.uploadDate)}</span>
+          </div>
         </div>
       </div>
 
-      <button className="download-btn" onClick={handleDownload} disabled={isDownloading}>
-        {isDownloading ? "⏳ Downloading..." : "⬇️ Download"}
-      </button>
+      <div className="card-actions">
+        <button className="action-btn view-btn" title="View">
+          <i className="fas fa-eye"></i>
+          <span>View</span>
+        </button>
+        <button className="action-btn download-btn" onClick={handleDownload} disabled={isDownloading} title="Download">
+          <i className="fas fa-download"></i>
+          <span>{isDownloading ? "..." : "Download"}</span>
+        </button>
+        {material.isOwner && (
+          <button className="action-btn delete-btn" onClick={handleDelete} disabled={isDeleting} title="Delete">
+            <i className="fas fa-trash"></i>
+            <span>{isDeleting ? "..." : "Delete"}</span>
+          </button>
+        )}
+      </div>
     </div>
   )
 }

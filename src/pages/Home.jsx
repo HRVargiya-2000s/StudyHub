@@ -7,7 +7,8 @@ import { collection, query, where, onSnapshot, orderBy } from "firebase/firestor
 import { db } from "../config/firebase"
 import FileCard from "../components/FileCard"
 import UploadModal from "../components/UploadModal"
-import "../styles/Home.css";  // ← Changed from "./Home.css"
+import Footer from "../components/Footer"
+import "../styles/Home.css"
 
 export default function Home() {
   const { user, userData } = useAuth()
@@ -39,6 +40,7 @@ export default function Home() {
       const materialsData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
+        isOwner: doc.data().uploaderUID === user?.uid,
       }))
       setMaterials(materialsData)
       setFilteredMaterials(materialsData)
@@ -46,7 +48,7 @@ export default function Home() {
     })
 
     return () => unsubscribe()
-  }, [userData?.class])
+  }, [userData?.class, user?.uid])
 
   useEffect(() => {
     let filtered = materials
@@ -69,11 +71,14 @@ export default function Home() {
   if (!userData?.class) {
     return (
       <div className="home-container">
-        <div className="class-required">
-          <div className="class-required-icon">⚠️</div>
+        <div className="class-required glass">
+          <div className="class-required-icon">
+            <i className="fas fa-exclamation-circle"></i>
+          </div>
           <h2>Class Required</h2>
           <p>You need to set your class in profile settings to access materials.</p>
           <button onClick={() => navigate("/profile")} className="primary-btn">
+            <i className="fas fa-arrow-right"></i>
             Go to Profile
           </button>
         </div>
@@ -82,79 +87,85 @@ export default function Home() {
   }
 
   return (
-    <div className="home-container">
-      {/* Header Section */}
-      <div className="home-header">
-        <div className="header-content">
-          <div>
-            <h1>Study Materials</h1>
-            <p className="header-subtitle">
-              Class: <span className="class-badge">{userData.class}</span>
-            </p>
+    <div className="home-wrapper">
+      <div className="home-container">
+        <div className="home-header">
+          <div className="header-content">
+            <div>
+              <h1 className="gradient-text">
+                <i className="fas fa-book"></i>
+                Study Materials
+              </h1>
+              <p className="header-subtitle">Discover and share study materials with your classmates</p>
+            </div>
+            <button onClick={() => setIsUploadModalOpen(true)} className="upload-btn">
+              <i className="fas fa-cloud-upload-alt"></i>
+              <span>Upload Material</span>
+            </button>
           </div>
-          <button onClick={() => setIsUploadModalOpen(true)} className="upload-btn">
-            <span className="upload-icon">+</span>
-            Upload Material
-          </button>
-        </div>
-      </div>
-
-      {/* Search and Filter Section */}
-      <div className="search-filter-section">
-        <div className="search-container">
-          <input
-            type="text"
-            placeholder="Search materials or uploader..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
-          />
-          <span className="search-icon">🔍</span>
         </div>
 
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          className="category-filter"
-        >
-          {categories.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
-          ))}
-        </select>
-      </div>
+        <div className="search-filter-section">
+          <div className="search-container">
+            <i className="fas fa-search"></i>
+            <input
+              type="text"
+              placeholder="Search materials or uploader..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </div>
 
-      {/* Materials Grid */}
-      <div className="materials-section">
-        {loading ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            <p>Loading materials...</p>
-          </div>
-        ) : filteredMaterials.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">📭</div>
-            <h3>No materials found</h3>
-            <p>
-              {searchQuery || selectedCategory !== "All"
-                ? "Try adjusting your search or filter"
-                : "Be the first to upload study materials for your class"}
-            </p>
-            {!searchQuery && selectedCategory === "All" && (
-              <button onClick={() => setIsUploadModalOpen(true)} className="primary-btn">
-                Upload First Material
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="materials-grid">
-            {filteredMaterials.map((material) => (
-              <FileCard key={material.id} material={material} />
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="category-filter"
+          >
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
             ))}
-          </div>
-        )}
+          </select>
+        </div>
+
+        {/* Materials Grid */}
+        <div className="materials-section">
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <p>Loading materials...</p>
+            </div>
+          ) : filteredMaterials.length === 0 ? (
+            <div className="empty-state glass">
+              <div className="empty-icon">
+                <i className="fas fa-inbox"></i>
+              </div>
+              <h3>No materials found</h3>
+              <p>
+                {searchQuery || selectedCategory !== "All"
+                  ? "Try adjusting your search or filter"
+                  : "Be the first to upload study materials for your class"}
+              </p>
+              {!searchQuery && selectedCategory === "All" && (
+                <button onClick={() => setIsUploadModalOpen(true)} className="primary-btn">
+                  <i className="fas fa-plus"></i>
+                  Upload First Material
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="materials-grid">
+              {filteredMaterials.map((material) => (
+                <FileCard key={material.id} material={material} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      <Footer />
 
       {/* Upload Modal */}
       {isUploadModalOpen && <UploadModal onClose={() => setIsUploadModalOpen(false)} />}
